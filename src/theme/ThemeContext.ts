@@ -3,33 +3,33 @@ import { createContext, useContext } from "react";
 export type ThemeMode = "dark" | "light";
 
 export type ThemeColors = {
-    // Backgrounds
+    // Arka Planlar
     background: string;
     surface: string;
     surfaceAlt: string;
-    // Accent
+    // Vurgu Renkleri
     primary: string;
     primaryMuted: string;
     primaryBorder: string;
     primaryBg: string;
     secondary: string;
-    // Text
+    // Metin
     textPrimary: string;
     textSecondary: string;
     textMuted: string;
     textOnPrimary: string;
-    // Status
+    // Durum
     success: string;
     successBg: string;
     successBorder: string;
     error: string;
     errorBg: string;
     errorBorder: string;
-    // Cards / Borders
+    // Kartlar / Kenarlıklar
     cardBg: string;
     cardBorder: string;
     divider: string;
-    // Specific
+    // Özel
     gold: string;
     pink: string;
     pinkMuted: string;
@@ -39,27 +39,27 @@ export type ThemeColors = {
     tabActiveText: string;
     tabActiveBg: string;
     tabActiveIconBg: string;
-    // Hero glow
+    // Hero parlaması
     glowPrimary: string;
     glowSecondary: string;
     glowTertiary: string;
-    // Search
+    // Arama
     searchBg: string;
     searchBorder: string;
     searchPlaceholder: string;
-    // Chip
+    // Etiket
     chipBg: string;
     chipBorder: string;
     chipText: string;
-    // Badge
+    // Rozet
     badgeBg: string;
     badgeBorder: string;
     badgeText: string;
-    // Cover overlay
+    // Kapak katmanı
     coverOverlay: string;
     coverBadgeBg: string;
     coverBadgeBorder: string;
-    // StatusBar
+    // Durum Çubuğu
     statusBarStyle: "light" | "dark";
 };
 
