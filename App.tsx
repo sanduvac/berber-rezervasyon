@@ -58,6 +58,7 @@ export default function App() {
   });
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
   const [favoriteBarberIds, setFavoriteBarberIds] = useState<string[]>([]);
+  const [profilePhotoUri, setProfilePhotoUri] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("home");
   const [route, setRoute] = useState<RouteState>({ name: "home" });
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -456,6 +457,8 @@ export default function App() {
       <ProfileScreen
         notificationSettings={notificationSettings}
         onNotificationSettingsChange={setNotificationSettings}
+        profilePhotoUri={profilePhotoUri}
+        onProfilePhotoChange={setProfilePhotoUri}
       />
     );
   })();

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useTheme } from "../theme/ThemeContext";
 
 export type NotificationSettings = {
@@ -54,11 +55,13 @@ type SettingItem = {
   icon?: string;
 };
 
-type ProfileView = "main" | "notifications" | "support";
+type ProfileView = "main" | "notifications" | "support" | "privacy" | "personal";
 
 type ProfileScreenProps = {
   notificationSettings: NotificationSettings;
   onNotificationSettingsChange: (settings: NotificationSettings) => void;
+  profilePhotoUri: string | null;
+  onProfilePhotoChange: (uri: string | null) => void;
 };
 
 function FaqItem({ question, answer }: { question: string; answer: string }) {
@@ -80,10 +83,65 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
   );
 }
 
-export function ProfileScreen({ notificationSettings, onNotificationSettingsChange }: ProfileScreenProps) {
+export function ProfileScreen({ notificationSettings, onNotificationSettingsChange, profilePhotoUri, onProfilePhotoChange }: ProfileScreenProps) {
   const { colors, mode, toggleTheme } = useTheme();
   const [view, setView] = useState<ProfileView>("main");
+  const [biometricLogin, setBiometricLogin] = useState(false);
+  const [twoFactorAuth, setTwoFactorAuth] = useState(false);
+  const [locationSharing, setLocationSharing] = useState(true);
+  const [analyticsData, setAnalyticsData] = useState(true);
+  const [personalName, setPersonalName] = useState("Oğuzhan Yılmaz");
+  const [personalPhone, setPersonalPhone] = useState("+90 555 123 45 67");
+  const [personalEmail, setPersonalEmail] = useState("oguzhan@example.com");
+  const [personalBirthday, setPersonalBirthday] = useState("15 Mart 1995");
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState("");
   const { allNotifications, appointmentReminders, systemNotifications } = notificationSettings;
+
+  async function pickImageFromGallery() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("İzin Gerekli", "Galeriye erişim için izin vermeniz gerekiyor.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      onProfilePhotoChange(result.assets[0].uri);
+    }
+  }
+
+  async function pickImageFromCamera() {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("İzin Gerekli", "Kamera erişimi için izin vermeniz gerekiyor.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      onProfilePhotoChange(result.assets[0].uri);
+    }
+  }
+
+  function showPhotoOptions() {
+    const buttons: any[] = [
+      { text: "Kamera", onPress: pickImageFromCamera },
+      { text: "Galeri", onPress: pickImageFromGallery },
+    ];
+    if (profilePhotoUri) {
+      buttons.push({ text: "Fotoğrafı Kaldır", style: "destructive" as const, onPress: () => onProfilePhotoChange(null) });
+    }
+    buttons.push({ text: "Vazgeç", style: "cancel" as const });
+    Alert.alert("Profil Fotoğrafı", "Fotoğraf kaynağını seçin", buttons);
+  }
 
   function SectionCard({ title, items, onItemPress }: { title: string; items: SettingItem[]; onItemPress?: (item: SettingItem) => void }) {
     return (
@@ -91,7 +149,7 @@ export function ProfileScreen({ notificationSettings, onNotificationSettingsChan
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{title}</Text>
         <View style={[styles.sectionCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
           {items.map((item, index) => {
-            const isClickable = item.id === "notifications" || item.id === "support";
+            const isClickable = item.id === "notifications" || item.id === "support" || item.id === "privacy" || item.id === "personal";
             return (
               <Pressable key={item.id}
                 style={[styles.itemRow, { borderBottomColor: colors.divider }, index === items.length - 1 && styles.itemRowLast]}
@@ -212,15 +270,243 @@ export function ProfileScreen({ notificationSettings, onNotificationSettingsChan
     );
   }
 
+  if (view === "privacy") {
+    return (
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <Pressable style={[styles.backButton, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]} onPress={() => setView("main")}>
+          <Ionicons name="chevron-back" size={18} color={colors.primaryMuted} />
+          <Text style={[styles.backButtonText, { color: colors.primaryMuted }]}>Geri</Text>
+        </Pressable>
+
+        <View style={[styles.hero, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
+          <View style={[styles.heroGlow, { backgroundColor: colors.glowPrimary }]} />
+          <Ionicons name="shield-checkmark" size={28} color={colors.primary} />
+          <Text style={[styles.name, { color: colors.textPrimary }]}>Gizlilik ve Güvenlik</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Hesap güvenliğini ve veri gizliliğini yönet.</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Hesap Güvenliği</Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+            <ToggleRow title="Biyometrik Giriş" subtitle="Parmak izi veya yüz tanıma ile giriş"
+              value={biometricLogin} onValueChange={setBiometricLogin}
+            />
+            <ToggleRow title="İki Faktörlü Doğrulama" subtitle="Giriş sırasında ek güvenlik kodu iste"
+              value={twoFactorAuth} onValueChange={setTwoFactorAuth}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Veri Gizliliği</Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+            <ToggleRow title="Konum Paylaşımı" subtitle="Yakınındaki berberleri bulmak için konum izni"
+              value={locationSharing} onValueChange={setLocationSharing}
+            />
+            <ToggleRow title="Analitik Verileri" subtitle="Uygulamayı geliştirmek için anonim kullanım verileri"
+              value={analyticsData} onValueChange={setAnalyticsData}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Uygulama İzinleri</Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+            <View style={[styles.itemRow, { borderBottomColor: colors.divider }]}>
+              <View style={[styles.itemIconWrap, { backgroundColor: colors.primaryBg }]}>
+                <Ionicons name="camera-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.itemTextWrap}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>Kamera</Text>
+                <Text style={[styles.itemSubtitle, { color: colors.textMuted }]}>Profil fotoğrafı çekmek için</Text>
+              </View>
+              <View style={[styles.badge, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]}>
+                <Text style={[styles.badgeText, { color: colors.primaryMuted }]}>İzinli</Text>
+              </View>
+            </View>
+            <View style={[styles.itemRow, { borderBottomColor: colors.divider }]}>
+              <View style={[styles.itemIconWrap, { backgroundColor: colors.primaryBg }]}>
+                <Ionicons name="location-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.itemTextWrap}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>Konum</Text>
+                <Text style={[styles.itemSubtitle, { color: colors.textMuted }]}>Yakındaki berberleri göstermek için</Text>
+              </View>
+              <View style={[styles.badge, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]}>
+                <Text style={[styles.badgeText, { color: colors.primaryMuted }]}>İzinli</Text>
+              </View>
+            </View>
+            <View style={[styles.itemRow, styles.itemRowLast, { borderBottomColor: colors.divider }]}>
+              <View style={[styles.itemIconWrap, { backgroundColor: colors.primaryBg }]}>
+                <Ionicons name="notifications-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.itemTextWrap}>
+                <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>Bildirimler</Text>
+                <Text style={[styles.itemSubtitle, { color: colors.textMuted }]}>Randevu hatırlatmaları için</Text>
+              </View>
+              <View style={[styles.badge, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]}>
+                <Text style={[styles.badgeText, { color: colors.primaryMuted }]}>İzinli</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.infoCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+          <View style={styles.infoIconRow}>
+            <Ionicons name="lock-closed" size={18} color={colors.primary} />
+            <Text style={[styles.infoTitle, { color: colors.primaryMuted }]}>Gizlilik Politikası</Text>
+          </View>
+          <Text style={[styles.infoText, { color: colors.textMuted }]}>
+            Verileriniz güvenli bir şekilde saklanır ve üçüncü taraflarla paylaşılmaz. Detaylı bilgi için gizlilik politikamızı inceleyebilirsiniz.
+          </Text>
+        </View>
+
+        <Pressable style={[styles.dangerButton, { backgroundColor: mode === "dark" ? "rgba(239, 68, 68, 0.1)" : "#FEF2F2", borderColor: mode === "dark" ? "rgba(239, 68, 68, 0.2)" : "#FECACA" }]}>
+          <Ionicons name="trash-outline" size={18} color="#EF4444" />
+          <Text style={styles.dangerButtonText}>Hesabı Sil</Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
+
+  if (view === "personal") {
+    const personalFields = [
+      { key: "name", label: "Ad Soyad", value: personalName, icon: "person-outline" as const, onSave: setPersonalName, keyboard: "default" as const },
+      { key: "phone", label: "Telefon", value: personalPhone, icon: "call-outline" as const, onSave: setPersonalPhone, keyboard: "phone-pad" as const },
+      { key: "email", label: "E-posta", value: personalEmail, icon: "mail-outline" as const, onSave: setPersonalEmail, keyboard: "email-address" as const },
+      { key: "birthday", label: "Doğum Tarihi", value: personalBirthday, icon: "calendar-outline" as const, onSave: setPersonalBirthday, keyboard: "default" as const },
+    ];
+
+    function startEditing(key: string, currentValue: string) {
+      setEditingField(key);
+      setEditingValue(currentValue);
+    }
+
+    function saveEditing(onSave: (v: string) => void) {
+      if (editingValue.trim()) {
+        onSave(editingValue.trim());
+      }
+      setEditingField(null);
+      setEditingValue("");
+    }
+
+    function cancelEditing() {
+      setEditingField(null);
+      setEditingValue("");
+    }
+
+    return (
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <Pressable style={[styles.backButton, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]} onPress={() => { cancelEditing(); setView("main"); }}>
+          <Ionicons name="chevron-back" size={18} color={colors.primaryMuted} />
+          <Text style={[styles.backButtonText, { color: colors.primaryMuted }]}>Geri</Text>
+        </Pressable>
+
+        <View style={[styles.hero, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
+          <View style={[styles.heroGlow, { backgroundColor: colors.glowPrimary }]} />
+          <Pressable onPress={showPhotoOptions} style={styles.avatarContainer}>
+            <View style={[styles.avatarCircle, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]}>
+              {profilePhotoUri ? (
+                <Image source={{ uri: profilePhotoUri }} style={styles.avatarImage} />
+              ) : (
+                <Ionicons name="person" size={28} color={colors.primaryMuted} />
+              )}
+            </View>
+            <View style={[styles.avatarEditBadge, { backgroundColor: colors.primary }]}>
+              <Ionicons name="camera" size={12} color="#FFFFFF" />
+            </View>
+          </Pressable>
+          <Text style={[styles.name, { color: colors.textPrimary }]}>Kişisel Bilgiler</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Bilgilerini düzenlemek için üzerine dokun.</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Bilgilerim</Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+            {personalFields.map((field, index) => {
+              const isEditing = editingField === field.key;
+              return (
+                <Pressable key={field.key}
+                  style={[
+                    styles.personalFieldRow,
+                    { borderBottomColor: colors.divider },
+                    index === personalFields.length - 1 && styles.itemRowLast,
+                    isEditing && [styles.personalFieldRowEditing, { borderColor: colors.primaryBorder, backgroundColor: colors.primaryBg }]
+                  ]}
+                  onPress={() => { if (!isEditing) startEditing(field.key, field.value); }}
+                >
+                  <View style={[styles.itemIconWrap, { backgroundColor: isEditing ? colors.primary : colors.primaryBg }]}>
+                    <Ionicons name={field.icon} size={18} color={isEditing ? "#FFFFFF" : colors.primary} />
+                  </View>
+                  <View style={styles.personalFieldTextWrap}>
+                    <Text style={[styles.personalFieldLabel, { color: isEditing ? colors.primary : colors.textMuted }]}>{field.label}</Text>
+                    {isEditing ? (
+                      <TextInput
+                        style={[styles.personalFieldInput, { color: colors.textPrimary, borderColor: colors.primaryBorder }]}
+                        value={editingValue}
+                        onChangeText={setEditingValue}
+                        autoFocus
+                        keyboardType={field.keyboard}
+                        returnKeyType="done"
+                        keyboardAppearance={mode}
+                        onSubmitEditing={() => saveEditing(field.onSave)}
+                        selectionColor={colors.primary}
+                        placeholderTextColor={colors.textMuted}
+                        placeholder={field.label}
+                      />
+                    ) : (
+                      <Text style={[styles.personalFieldValue, { color: colors.textPrimary }]}>{field.value}</Text>
+                    )}
+                  </View>
+                  {isEditing ? (
+                    <View style={styles.editActions}>
+                      <Pressable onPress={cancelEditing} style={[styles.editActionBtn, { backgroundColor: mode === "dark" ? "rgba(239, 68, 68, 0.15)" : "#FEF2F2" }]}>
+                        <Ionicons name="close" size={16} color="#EF4444" />
+                      </Pressable>
+                      <Pressable onPress={() => saveEditing(field.onSave)} style={[styles.editActionBtn, { backgroundColor: mode === "dark" ? "rgba(34, 197, 94, 0.15)" : "#F0FDF4" }]}>
+                        <Ionicons name="checkmark" size={16} color="#22C55E" />
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <Ionicons name="create-outline" size={16} color={colors.primary} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={[styles.infoCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+          <View style={styles.infoIconRow}>
+            <Ionicons name="information-circle" size={18} color={colors.primary} />
+            <Text style={[styles.infoTitle, { color: colors.primaryMuted }]}>Bilgilendirme</Text>
+          </View>
+          <Text style={[styles.infoText, { color: colors.textMuted }]}>
+            Bu bilgiler şu anda temsilî verilerdir. İlerleyen süreçte gerçek hesap bilgilerinizle eşleştirilecektir.
+          </Text>
+        </View>
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
       <View style={[styles.hero, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
         <View style={[styles.heroGlow, { backgroundColor: colors.glowPrimary }]} />
-        <View style={[styles.avatarCircle, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]}>
-          <Ionicons name="person" size={28} color={colors.primaryMuted} />
-        </View>
+        <Pressable onPress={showPhotoOptions} style={styles.avatarContainer}>
+          <View style={[styles.avatarCircle, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]}>
+            {profilePhotoUri ? (
+              <Image source={{ uri: profilePhotoUri }} style={styles.avatarImage} />
+            ) : (
+              <Ionicons name="person" size={28} color={colors.primaryMuted} />
+            )}
+          </View>
+          <View style={[styles.avatarEditBadge, { backgroundColor: colors.primary }]}>
+            <Ionicons name="camera" size={12} color="#FFFFFF" />
+          </View>
+        </Pressable>
         <Text style={[styles.name, { color: colors.textPrimary }]}>Profil Bilgileri</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Bu bölümün detayları sonraki adımda eklenecek.</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Fotoğrafını değiştirmek için üzerine dokun.</Text>
       </View>
 
       <View style={styles.section}>
@@ -243,11 +529,16 @@ export function ProfileScreen({ notificationSettings, onNotificationSettingsChan
         </View>
       </View>
 
-      <SectionCard title="Hesap" items={ACCOUNT_ITEMS} />
+      <SectionCard title="Hesap" items={ACCOUNT_ITEMS}
+        onItemPress={(item) => {
+          if (item.id === "personal") setView("personal");
+        }}
+      />
       <SectionCard title="Uygulama" items={APP_ITEMS}
         onItemPress={(item) => {
           if (item.id === "notifications") setView("notifications");
           else if (item.id === "support") setView("support");
+          else if (item.id === "privacy") setView("privacy");
         }}
       />
 
@@ -264,6 +555,11 @@ export function ProfileScreen({ notificationSettings, onNotificationSettingsChan
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  dangerButton: {
+    marginTop: 18, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 16,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8
+  },
+  dangerButtonText: { color: "#EF4444", fontWeight: "700", fontSize: 15 },
   content: { paddingBottom: 80 },
   backButton: {
     alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4,
@@ -276,9 +572,19 @@ const styles = StyleSheet.create({
   heroGlow: {
     position: "absolute", width: 200, height: 200, borderRadius: 999, top: -80, right: -40
   },
+  avatarContainer: {
+    position: "relative", marginBottom: 8
+  },
   avatarCircle: {
-    width: 56, height: 56, borderRadius: 999, borderWidth: 2,
-    alignItems: "center", justifyContent: "center", marginBottom: 8
+    width: 72, height: 72, borderRadius: 999, borderWidth: 2,
+    alignItems: "center", justifyContent: "center", overflow: "hidden"
+  },
+  avatarImage: {
+    width: "100%", height: "100%", borderRadius: 999
+  },
+  avatarEditBadge: {
+    position: "absolute", bottom: 0, right: -2, width: 26, height: 26, borderRadius: 999,
+    alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF"
   },
   name: { fontSize: 22, fontWeight: "800", letterSpacing: -0.2, marginTop: 4 },
   subtitle: { marginTop: 6, lineHeight: 19, textAlign: "center" },
@@ -341,5 +647,24 @@ const styles = StyleSheet.create({
   },
   faqAnswer: {
     fontSize: 14, lineHeight: 21
+  },
+  personalFieldRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 14, paddingVertical: 16, borderBottomWidth: 1
+  },
+  personalFieldTextWrap: { flex: 1 },
+  personalFieldLabel: { fontSize: 12, fontWeight: "600", marginBottom: 2 },
+  personalFieldValue: { fontSize: 15, fontWeight: "700" },
+  personalFieldRowEditing: {
+    borderWidth: 1, borderRadius: 14, marginHorizontal: -2, paddingHorizontal: 16
+  },
+  personalFieldInput: {
+    fontSize: 15, fontWeight: "700", paddingVertical: 6, paddingHorizontal: 0,
+    borderBottomWidth: 1.5, marginTop: 2
+  },
+  editActions: { flexDirection: "row", gap: 8 },
+  editActionBtn: {
+    width: 32, height: 32, borderRadius: 10,
+    alignItems: "center", justifyContent: "center"
   }
 });

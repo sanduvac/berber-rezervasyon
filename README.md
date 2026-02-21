@@ -34,6 +34,9 @@ Modern ve şık tasarımlı bir berber randevu uygulaması. React Native + Expo 
 - Favori berberlerin ayrı sekmede listelenmesi
 
 ### 👤 Profil & Ayarlar
+- **📸 Profil Fotoğrafı:** Kamera veya galeriden fotoğraf seçme/değiştirme/kaldırma
+- **👤 Kişisel Bilgiler:** Ad, telefon, e-posta, doğum tarihi ve cinsiyet bilgilerini görüntüleme ve düzenleme
+- **🔒 Gizlilik & Güvenlik:** Biyometrik giriş, iki faktörlü doğrulama, konum paylaşımı ve analitik veri izinleri
 - **🌗 Koyu / Açık Mod:** Görünüm bölümünden tema değiştirme
 - **🔔 Bildirim Ayarları:** Randevu hatırlatma ve sistem bildirimleri
 - **❓ Yardım Merkezi (SSS):** Uygulama hakkında sıkça sorulan sorular (açılır/kapanır akordeon)
@@ -53,6 +56,7 @@ Modern ve şık tasarımlı bir berber randevu uygulaması. React Native + Expo 
 | react-native-maps | 1.18 |
 | expo-location | ~18 |
 | expo-notifications | ~0.29 |
+| expo-image-picker | ~16 |
 
 ## 🚀 Kurulum ve Çalıştırma
 
@@ -108,6 +112,25 @@ const FORCE_TEST_LOCATION = true;
 ```
 
 Gerçek cihaz konumunu kullanmak için bu değerleri `false` yapın.
+
+## 📝 Güncelleme Notları
+
+### v1.1.0 — 21 Şubat 2026
+- 📸 **Profil fotoğrafı:** Kamera veya galeriden profil fotoğrafı seçme, değiştirme ve kaldırma desteği eklendi
+- 👤 **Kişisel bilgiler sayfası:** Ad, telefon, e-posta, doğum tarihi ve cinsiyet bilgilerini görüntüleme ve satır içi düzenleme
+- 🔒 **Gizlilik & güvenlik ayarları:** Biyometrik giriş, iki faktörlü doğrulama, konum paylaşımı ve analitik veri izinleri
+- 📦 `expo-image-picker` paketi eklendi
+
+### v1.0.0 — 20 Şubat 2026
+- 🏠 Ana sayfa, berber listesi ve arama
+- 💇 Berber detay, hizmetler ve yorumlar
+- 📅 Randevu sistemi (seçim → onay → listeleme → detay → iptal)
+- 🗺️ Uygulama içi yol tarifi (OSRM Route API)
+- 🗺️ Harita sekmesi (tüm berber konumları)
+- ❤️ Favoriler
+- 🌗 Koyu / Açık mod tema sistemi
+- 🔔 Bildirim ayarları
+- ❓ Yardım merkezi (SSS)
 
 ## 📋 Gelecek Planları
 
