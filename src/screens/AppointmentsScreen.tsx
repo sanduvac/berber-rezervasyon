@@ -65,6 +65,12 @@ export function AppointmentsScreen() {
 
   return (
     <View style={styles.container}>
+      {navigation.canGoBack() && (
+        <Pressable style={[styles.backButton, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={18} color={colors.primaryMuted} />
+          <Text style={[styles.backButtonText, { color: colors.primaryMuted }]}>Geri</Text>
+        </Pressable>
+      )}
       <Text style={[styles.title, { color: colors.textPrimary }]}>Randevularım</Text>
       <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Aldığın randevular burada listelenir.</Text>
 
@@ -128,6 +134,8 @@ export function AppointmentsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  backButton: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, marginBottom: 12 },
+  backButtonText: { fontWeight: "700" },
   title: { fontSize: 28, fontWeight: "800", letterSpacing: -0.3 },
   subtitle: { marginTop: 6, marginBottom: 14 },
   listContent: { paddingBottom: 80 },
