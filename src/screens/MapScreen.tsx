@@ -85,6 +85,12 @@ export function MapScreen() {
       {/* Header */}
       <View style={[styles.headerCard, heroStyle]}>
         <View style={[styles.headerGlow, { backgroundColor: isDark ? "rgba(0, 210, 255, 0.08)" : "rgba(255, 255, 255, 0.1)" }]} />
+        {navigation.canGoBack() && (
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={16} color="#ffffff" />
+            <Text style={styles.backButtonText}>Geri</Text>
+          </Pressable>
+        )}
         <View style={styles.headerTitleRow}>
           <Ionicons name="map" size={24} color={isDark ? "#00D2FF" : "#ffffff"} />
           <Text style={styles.title}>Yakındakiler</Text>
@@ -182,6 +188,8 @@ const styles = StyleSheet.create({
     borderRadius: 22, borderWidth: 1, paddingHorizontal: 18, paddingVertical: 16,
     overflow: "hidden", marginBottom: 8
   },
+  backButton: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: "rgba(255,255,255,0.3)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, marginBottom: 12 },
+  backButtonText: { fontWeight: "700", fontSize: 13, color: "#ffffff" },
   headerGlow: { position: "absolute", width: 160, height: 160, borderRadius: 999, top: -60, right: -30 },
   headerTitleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 },
   title: { color: "#ffffff", fontSize: 28, fontWeight: "800", letterSpacing: -0.3 },

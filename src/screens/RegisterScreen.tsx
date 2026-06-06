@@ -13,12 +13,14 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../theme/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import { useNavigation } from "@react-navigation/native";
 
 type Props = {
   onGoToLogin: () => void;
 };
 
 export function RegisterScreen({ onGoToLogin }: Props) {
+  const navigation = useNavigation<any>();
   const { colors, mode } = useTheme();
   const { register } = useAuth();
   const [name, setName] = useState("");
@@ -86,6 +88,12 @@ export function RegisterScreen({ onGoToLogin }: Props) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {navigation.canGoBack() && (
+          <Pressable style={[styles.backButton, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={18} color={colors.primaryMuted} />
+            <Text style={[styles.backButtonText, { color: colors.primaryMuted }]}>Geri</Text>
+          </Pressable>
+        )}
         {/* Hero */}
         <View style={styles.heroSection}>
           <View style={[styles.iconCircle, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]}>
@@ -219,6 +227,8 @@ export function RegisterScreen({ onGoToLogin }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  backButton: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, marginBottom: 12 },
+  backButtonText: { fontWeight: "700" },
   scrollContent: {
     flexGrow: 1,
     justifyContent: "center",

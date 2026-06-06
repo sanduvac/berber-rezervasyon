@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../theme/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { sendPasswordResetEmail } from "firebase/auth";
+import { useNavigation } from "@react-navigation/native";
 import { auth } from "../services/firebaseConfig";
 import { mediumHaptic, successHaptic } from "../utils/haptics";
 
@@ -23,6 +24,7 @@ type Props = {
 };
 
 export function LoginScreen({ onGoToRegister }: Props) {
+  const navigation = useNavigation<any>();
   const { colors, mode } = useTheme();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
@@ -101,6 +103,12 @@ export function LoginScreen({ onGoToRegister }: Props) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {navigation.canGoBack() && (
+          <Pressable style={[styles.backButton, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={18} color={colors.primaryMuted} />
+            <Text style={[styles.backButtonText, { color: colors.primaryMuted }]}>Geri</Text>
+          </Pressable>
+        )}
         {/* Hero */}
         <View style={styles.heroSection}>
           <View style={[styles.iconCircle, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]}>
@@ -201,6 +209,8 @@ export function LoginScreen({ onGoToRegister }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  backButton: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, marginBottom: 12 },
+  backButtonText: { fontWeight: "700" },
   scrollContent: {
     flexGrow: 1,
     justifyContent: "center",

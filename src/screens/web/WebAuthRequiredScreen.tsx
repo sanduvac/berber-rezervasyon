@@ -50,9 +50,9 @@ export function WebAuthRequiredScreen() {
             </Pressable>
           </View>
 
-          <Pressable style={styles.backHomeButton} onPress={() => navigation.navigate("WebLanding")}>
+          <Pressable style={styles.backHomeButton} onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate("WebLanding")}>
             <Ionicons name="arrow-back-outline" size={16} color={colors.textMuted} />
-            <Text style={[styles.backHomeText, { color: colors.textMuted }]}>Ana sayfaya dön</Text>
+            <Text style={[styles.backHomeText, { color: colors.textMuted }]}>Geri dön</Text>
           </Pressable>
         </View>
       </View>

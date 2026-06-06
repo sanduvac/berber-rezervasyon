@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "../theme/ThemeContext";
 import { useApp } from "../context/AppContext";
 import { useAuth } from "../context/AuthContext";
@@ -33,6 +34,7 @@ type SettingItem = {
 type ProfileView = "main" | "notifications" | "support" | "privacy" | "personal";
 
 export function ProfileScreen() {
+  const navigation = useNavigation<any>();
   const { notificationSettings, setNotificationSettings, profilePhotoUri, setProfilePhotoUri, userProfile, updateUserProfile } = useApp();
   const { colors, mode, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
@@ -167,6 +169,12 @@ export function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      {navigation.canGoBack() && (
+        <Pressable style={[styles.backButton, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={18} color={colors.primaryMuted} />
+          <Text style={[styles.backButtonText, { color: colors.primaryMuted }]}>Geri</Text>
+        </Pressable>
+      )}
       <View style={[styles.hero, { backgroundColor: colors.surfaceAlt, borderColor: colors.cardBorder }]}>
         <View style={[styles.heroGlow, { backgroundColor: colors.glowPrimary }]} />
         <View style={[styles.avatarContainer, { borderColor: colors.primaryBorder }]}>
@@ -265,6 +273,8 @@ export function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  backButton: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, marginBottom: 12 },
+  backButtonText: { fontWeight: "700" },
   logoutButton: {
     marginTop: 18, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 16,
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8
