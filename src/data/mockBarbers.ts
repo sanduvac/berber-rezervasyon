@@ -33,6 +33,7 @@ function createAvailability(bookedByDayOffset: Record<number, string[]>): Barber
 export const mockBarbers: Barber[] = [
   {
     id: "1",
+    ownerUid: "sS7M1bhkIZfCkahPKJK6crwvZHD3",
     name: "Klasik Kesim Berber",
     coverImageUrl:
       "https://images.unsplash.com/photo-1519500528352-2d1460418d41?auto=format&fit=crop&w=1200&q=80",
@@ -74,6 +75,7 @@ export const mockBarbers: Barber[] = [
   },
   {
     id: "2",
+    ownerUid: null,
     name: "Usta Makas",
     coverImageUrl:
       "https://images.unsplash.com/photo-1508057198894-247b23fe5ade?auto=format&fit=crop&w=1200&q=80",
@@ -108,6 +110,7 @@ export const mockBarbers: Barber[] = [
   },
   {
     id: "3",
+    ownerUid: null,
     name: "Mahalle Berberi",
     coverImageUrl:
       "https://images.unsplash.com/photo-1526779259212-939e64788e3c?auto=format&fit=crop&w=1200&q=80",

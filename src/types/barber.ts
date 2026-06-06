@@ -29,6 +29,9 @@ export type BarberCoordinates = {
 
 export type Barber = {
   id: string;
+  ownerUid: string | null;
+  ownerName?: string;
+  ownerEmail?: string;
   name: string;
   coverImageUrl: string;
   locationLabel: string;

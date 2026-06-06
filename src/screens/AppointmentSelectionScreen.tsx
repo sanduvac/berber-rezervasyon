@@ -1,186 +1,537 @@
-import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Barber, BarberService } from "../types/barber";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useTheme } from "../theme/ThemeContext";
+import { useApp } from "../context/AppContext";
+import { formatDateLabel, isPastSlot } from "../utils/dateUtils";
+import { mediumHaptic, selectionHaptic } from "../utils/haptics";
 
-type AppointmentSelectionScreenProps = {
-  barber: Barber;
-  service: BarberService;
-  initialDate?: string;
-  initialTime?: string;
-  onBack: () => void;
-  onContinue: (date: string, time: string) => void;
+type AppointmentSelectionParams = {
+  barberId?: string;
+  serviceId?: string;
+  preselectedDate?: string;
+  preselectedTime?: string;
 };
 
-const MONTH_NAMES = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
-const WEEKDAY_NAMES = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+export function AppointmentSelectionScreen() {
+  const navigation = useNavigation<any>();
+  const route = useRoute();
+  const { width } = useWindowDimensions();
+  const { getBarber, getService } = useApp();
+  const { colors } = useTheme();
 
-function parseDateKey(value: string): Date {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
+  const routeParams = route.params as AppointmentSelectionParams | undefined;
+  const barber = routeParams?.barberId ? getBarber(routeParams.barberId) : undefined;
+  const service = routeParams?.barberId && routeParams?.serviceId ? getService(routeParams.barberId, routeParams.serviceId) : undefined;
+  const isWide = width >= 960;
 
-function formatDateLabel(dateKey: string): string {
-  const date = parseDateKey(dateKey);
-  return `${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${WEEKDAY_NAMES[date.getDay()]}`;
-}
+  const availableDates = useMemo(() => {
+    if (!barber) return [];
+    return barber.availability.filter((day) =>
+      day.slots.some((slot) => !slot.isBooked && !isPastSlot(day.date, slot.time))
+    );
+  }, [barber]);
 
-function isPastSlot(dateKey: string, time: string, now: Date = new Date()): boolean {
-  const [hour, minute] = time.split(":").map(Number);
-  const slotDate = parseDateKey(dateKey);
-  slotDate.setHours(hour, minute, 0, 0);
-  return slotDate.getTime() < now.getTime();
-}
+  const [selectedDate, setSelectedDate] = useState<string | null>(routeParams?.preselectedDate ?? null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(routeParams?.preselectedTime ?? null);
 
-export function AppointmentSelectionScreen({ barber, service, initialDate, initialTime, onBack, onContinue }: AppointmentSelectionScreenProps) {
-  const { colors, mode } = useTheme();
-  const [selectedDate, setSelectedDate] = useState<string | null>(() => {
-    if (initialDate) return initialDate;
-    const firstAvailableDay = barber.availability.find((day) => day.slots.some((slot) => !slot.isBooked && !isPastSlot(day.date, slot.time)));
-    return firstAvailableDay?.date ?? barber.availability[0]?.date ?? null;
-  });
-  const [selectedTime, setSelectedTime] = useState<string | null>(initialTime ?? null);
-  const selectedDay = useMemo(() => barber.availability.find((day) => day.date === selectedDate) ?? null, [barber.availability, selectedDate]);
-  const canContinue = useMemo(() => {
-    if (!selectedDay || !selectedTime) return false;
-    const selectedSlot = selectedDay.slots.find((slot) => slot.time === selectedTime);
-    if (!selectedSlot) return false;
-    return !selectedSlot.isBooked && !isPastSlot(selectedDay.date, selectedSlot.time);
-  }, [selectedDay, selectedTime]);
+  useEffect(() => {
+    if (!barber) return;
+    if (selectedDate && availableDates.some((day) => day.date === selectedDate)) return;
+    setSelectedDate(routeParams?.preselectedDate ?? availableDates[0]?.date ?? null);
+  }, [availableDates, barber, routeParams?.preselectedDate, selectedDate]);
 
-  const disabledBg = mode === "dark" ? "rgba(18, 22, 45, 0.4)" : "rgba(148, 163, 184, 0.1)";
-  const disabledBorder = mode === "dark" ? "rgba(58, 69, 99, 0.2)" : "rgba(148, 163, 184, 0.2)";
-  const disabledText = mode === "dark" ? "#3A4563" : "#CBD5E1";
-  const selectedBg = mode === "dark" ? "rgba(108, 92, 231, 0.3)" : "rgba(108, 92, 231, 0.12)";
-  const selectedBorder = mode === "dark" ? "rgba(108, 92, 231, 0.5)" : "rgba(108, 92, 231, 0.4)";
+  const slotsForDate = useMemo(() => {
+    if (!barber || !selectedDate) return [];
+    const day = barber.availability.find((item) => item.date === selectedDate);
+    return day?.slots ?? [];
+  }, [barber, selectedDate]);
+
+  useEffect(() => {
+    if (!selectedTime || !selectedDate) return;
+    const selectedSlot = slotsForDate.find((slot) => slot.time === selectedTime);
+    if (!selectedSlot || selectedSlot.isBooked || isPastSlot(selectedDate, selectedSlot.time)) {
+      setSelectedTime(null);
+    }
+  }, [selectedDate, selectedTime, slotsForDate]);
+
+  const availableSlotCount = slotsForDate.filter((slot) => !slot.isBooked && !isPastSlot(selectedDate ?? "", slot.time)).length;
+
+  if (!barber || !service) {
+    return (
+      <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
+        <View style={[styles.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+          <Ionicons name="calendar-clear-outline" size={42} color={colors.textMuted} />
+          <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Randevu bilgisi bulunamadı</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            Hizmet veya berber bilgisi yüklenemedi. Lütfen berber detayından tekrar seçim yapın.
+          </Text>
+          <Pressable style={[styles.emptyButton, { backgroundColor: colors.primary }]} onPress={() => navigation.goBack()}>
+            <Text style={styles.emptyButtonText}>Geri Dön</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  function handleSelectDate(date: string) {
+    selectionHaptic();
+    setSelectedDate(date);
+    setSelectedTime(null);
+  }
+
+  function handleContinue() {
+    if (!selectedDate || !selectedTime || !barber || !service) return;
+    mediumHaptic();
+    navigation.navigate("AppointmentConfirm", {
+      barberId: barber.id,
+      serviceId: service.id,
+      date: selectedDate,
+      time: selectedTime
+    });
+  }
 
   return (
-    <View style={styles.container}>
-      <Pressable style={[styles.backButton, { backgroundColor: colors.primaryBg, borderColor: colors.primaryBorder }]} onPress={onBack}>
-        <Ionicons name="chevron-back" size={18} color={colors.primaryMuted} />
-        <Text style={[styles.backButtonText, { color: colors.primaryMuted }]}>Geri</Text>
-      </Pressable>
-
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>Randevu Saati Seç</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Hizmet: {service.name}</Text>
+        <View style={styles.page}>
+          <View style={[styles.heroCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+            <Image source={{ uri: barber.coverImageUrl }} style={styles.coverImage} resizeMode="cover" />
+            <View style={[styles.coverOverlay, { backgroundColor: colors.coverOverlay }]} />
 
-        <View style={[styles.serviceInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
-          <View style={styles.serviceInfoLeft}>
-            <View style={[styles.serviceInfoIcon, { backgroundColor: colors.primaryBg }]}>
-              <Ionicons name="cut" size={18} color={colors.primary} />
-            </View>
-            <Text style={[styles.serviceInfoTitle, { color: colors.textPrimary }]}>{service.name}</Text>
-          </View>
-          <Text style={[styles.serviceInfoPrice, { color: colors.secondary }]}>{service.price} TL</Text>
-        </View>
-
-        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tarih Seçimi</Text>
-        <Text style={[styles.sectionCaption, { color: colors.textMuted }]}>Dolu günler gri ve seçilemez görünür.</Text>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateRow}>
-          {barber.availability.map((day) => {
-            const hasAvailableSlot = day.slots.some((slot) => !slot.isBooked && !isPastSlot(day.date, slot.time));
-            const isSelected = selectedDate === day.date;
-            return (
-              <Pressable key={day.date}
-                style={[styles.dateChip, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
-                isSelected && { backgroundColor: selectedBg, borderColor: selectedBorder },
-                !hasAvailableSlot && { backgroundColor: disabledBg, borderColor: disabledBorder }
-                ]}
-                onPress={() => { setSelectedDate(day.date); setSelectedTime(null); }}
-                disabled={!hasAvailableSlot}
+            <View style={styles.heroTopRow}>
+              <Pressable
+                style={[styles.coverButton, { backgroundColor: colors.coverBadgeBg, borderColor: colors.coverBadgeBorder }]}
+                onPress={() => navigation.goBack()}
               >
-                <Text style={[styles.dateChipText, { color: colors.textSecondary },
-                isSelected && { color: colors.primaryMuted, fontWeight: "700" },
-                !hasAvailableSlot && { color: disabledText }
-                ]}>{formatDateLabel(day.date)}</Text>
+                <Ionicons name="chevron-back" size={18} color={colors.textPrimary} />
+                <Text style={[styles.coverButtonText, { color: colors.textPrimary }]}>Geri</Text>
               </Pressable>
-            );
-          })}
-        </ScrollView>
+            </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Saat Seçimi</Text>
-        <Text style={[styles.sectionCaption, { color: colors.textMuted }]}>Dolu saatler gri, boş saatler seçilebilir.</Text>
-
-        {selectedDay ? (
-          <View style={styles.slotGrid}>
-            {selectedDay.slots.map((slot) => {
-              const slotIsDisabled = slot.isBooked || isPastSlot(selectedDay.date, slot.time);
-              const slotIsSelected = selectedTime === slot.time;
-              return (
-                <Pressable key={`${selectedDay.date}-${slot.time}`}
-                  style={[styles.slotButton, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
-                  slotIsDisabled && { backgroundColor: disabledBg, borderColor: disabledBorder },
-                  slotIsSelected && { backgroundColor: selectedBg, borderColor: selectedBorder }
-                  ]}
-                  onPress={() => setSelectedTime(slot.time)} disabled={slotIsDisabled}
-                >
-                  <Text style={[styles.slotButtonText, { color: colors.textSecondary },
-                  slotIsDisabled && { color: disabledText },
-                  slotIsSelected && { color: colors.primaryMuted }
-                  ]}>{slot.time}</Text>
-                </Pressable>
-              );
-            })}
+            <View style={styles.heroContent}>
+              <View style={[styles.stepBadge, { backgroundColor: colors.coverBadgeBg, borderColor: colors.coverBadgeBorder }]}>
+                <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.stepBadgeText}>Randevu zamanı seç</Text>
+              </View>
+              <Text style={styles.heroTitle}>{barber.name}</Text>
+              <Text style={styles.heroDescription}>
+                {service.name} için sana uygun tarihi ve saati seç.
+              </Text>
+            </View>
           </View>
-        ) : (
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>Bu berber için uygun tarih yok.</Text>
-        )}
 
-        {selectedDay && !selectedDay.slots.some((slot) => !slot.isBooked && !isPastSlot(selectedDay.date, slot.time)) ? (
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>Bu tarihte seçilebilir saat kalmadı.</Text>
-        ) : null}
+          <View style={[styles.contentGrid, isWide && styles.contentGridWide]}>
+            <View style={styles.mainColumn}>
+              <View style={[styles.sectionCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+                <View style={styles.sectionHeader}>
+                  <View>
+                    <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tarih Seç</Text>
+                    <Text style={[styles.sectionCaption, { color: colors.textMuted }]}>
+                      Sadece müsait randevu günü olan tarihler listelenir.
+                    </Text>
+                  </View>
+                  <Ionicons name="calendar-number-outline" size={24} color={colors.primary} />
+                </View>
 
-        <View style={styles.selectionRow}>
-          <Ionicons name="checkmark-circle" size={16} color={selectedDate && selectedTime ? colors.secondary : colors.textMuted} />
-          <Text style={[styles.selectionText, { color: colors.textSecondary }]}>
-            {selectedDate && selectedTime ? `Seçim: ${formatDateLabel(selectedDate)} ${selectedTime}` : "Seçim yapmak için bir saat kutusuna dokun."}
-          </Text>
+                {availableDates.length ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateRow}>
+                    {availableDates.map((day) => {
+                      const isSelected = selectedDate === day.date;
+                      const freeSlots = day.slots.filter((slot) => !slot.isBooked && !isPastSlot(day.date, slot.time)).length;
+                      return (
+                        <Pressable
+                          key={day.date}
+                          style={[
+                            styles.dateCard,
+                            { backgroundColor: colors.surface, borderColor: colors.cardBorder },
+                            isSelected && { backgroundColor: colors.primaryBg, borderColor: colors.primary }
+                          ]}
+                          onPress={() => handleSelectDate(day.date)}
+                        >
+                          <Text style={[styles.dateLabel, { color: isSelected ? colors.primary : colors.textPrimary }]}>{formatDateLabel(day.date)}</Text>
+                          <Text style={[styles.dateSlotCount, { color: isSelected ? colors.primaryMuted : colors.textMuted }]}>{freeSlots} müsait saat</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                ) : (
+                  <View style={[styles.noSlotCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                    <Ionicons name="calendar-clear-outline" size={28} color={colors.textMuted} />
+                    <Text style={[styles.noSlotTitle, { color: colors.textPrimary }]}>Müsait tarih yok</Text>
+                    <Text style={[styles.noSlotText, { color: colors.textSecondary }]}>Bu hizmet için yakın tarihte boş randevu görünmüyor.</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={[styles.sectionCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+                <View style={styles.sectionHeader}>
+                  <View>
+                    <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Saat Seç</Text>
+                    <Text style={[styles.sectionCaption, { color: colors.textMuted }]}>
+                      {selectedDate ? `${formatDateLabel(selectedDate)} tarihinde ${availableSlotCount} saat müsait.` : "Önce bir tarih seçin."}
+                    </Text>
+                  </View>
+                  <Ionicons name="time-outline" size={24} color={colors.primary} />
+                </View>
+
+                {slotsForDate.length ? (
+                  <View style={styles.timeGrid}>
+                    {slotsForDate.map((slot) => {
+                      const past = isPastSlot(selectedDate ?? "", slot.time);
+                      const disabled = slot.isBooked || past;
+                      const isSelected = selectedTime === slot.time;
+                      return (
+                        <Pressable
+                          key={slot.time}
+                          disabled={disabled}
+                          style={[
+                            styles.timeCard,
+                            { backgroundColor: colors.surface, borderColor: colors.cardBorder },
+                            disabled && { opacity: 0.38 },
+                            isSelected && { backgroundColor: colors.primaryBg, borderColor: colors.primary }
+                          ]}
+                          onPress={() => {
+                            selectionHaptic();
+                            setSelectedTime(slot.time);
+                          }}
+                        >
+                          <Text style={[styles.timeText, { color: isSelected ? colors.primary : colors.textPrimary }, disabled && { color: colors.textMuted }]}>
+                            {slot.time}
+                          </Text>
+                          <Text style={[styles.timeStatus, { color: isSelected ? colors.primaryMuted : colors.textMuted }]}>
+                            {slot.isBooked ? "Dolu" : past ? "Geçti" : "Müsait"}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <View style={[styles.noSlotCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                    <Ionicons name="time-outline" size={28} color={colors.textMuted} />
+                    <Text style={[styles.noSlotTitle, { color: colors.textPrimary }]}>Saat bulunamadı</Text>
+                    <Text style={[styles.noSlotText, { color: colors.textSecondary }]}>Önce müsait bir tarih seçin veya daha sonra tekrar kontrol edin.</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View style={[styles.sideColumn, isWide && styles.sideColumnWide]}>
+              <View style={[styles.summaryCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+                <Text style={[styles.summaryTitle, { color: colors.textPrimary }]}>Randevu Özeti</Text>
+                <InfoLine icon="cut-outline" label="Hizmet" value={service.name} colors={colors} />
+                <InfoLine icon="wallet-outline" label="Ücret" value={`${service.price} TL`} colors={colors} />
+                <InfoLine icon="calendar-outline" label="Tarih" value={selectedDate ? formatDateLabel(selectedDate) : "Seçilmedi"} colors={colors} />
+                <InfoLine icon="time-outline" label="Saat" value={selectedTime ?? "Seçilmedi"} colors={colors} />
+              </View>
+
+              <Pressable
+                style={[styles.continueButton, { backgroundColor: colors.primary }, !selectedTime && styles.continueButtonDisabled]}
+                disabled={!selectedTime}
+                onPress={handleContinue}
+              >
+                <Text style={styles.continueButtonText}>Devam Et</Text>
+                <Ionicons name="arrow-forward" size={18} color="#ffffff" />
+              </Pressable>
+
+              <Text style={[styles.helpText, { color: colors.textMuted }]}>
+                Randevuyu bir sonraki ekranda son kez kontrol edeceksin.
+              </Text>
+            </View>
+          </View>
         </View>
-
-        <Pressable
-          style={[styles.continueButton, !canContinue && { backgroundColor: mode === "dark" ? "rgba(108, 92, 231, 0.3)" : "rgba(108, 92, 231, 0.4)", shadowOpacity: 0 }]}
-          onPress={() => { if (selectedDate && selectedTime) onContinue(selectedDate, selectedTime); }}
-          disabled={!canContinue}
-        >
-          <Text style={styles.continueButtonText}>Devam Et</Text>
-          <Ionicons name="arrow-forward" size={18} color="#ffffff" />
-        </Pressable>
       </ScrollView>
     </View>
   );
 }
 
+function InfoLine({ icon, label, value, colors }: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+}) {
+  return (
+    <View style={[styles.infoLine, { borderBottomColor: colors.divider }]}>
+      <View style={styles.infoLineLeft}>
+        <Ionicons name={icon} size={16} color={colors.primary} />
+        <Text style={[styles.infoLineLabel, { color: colors.textSecondary }]}>{label}</Text>
+      </View>
+      <Text style={[styles.infoLineValue, { color: colors.textPrimary }]}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollContent: { paddingBottom: 80 },
-  backButton: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, marginBottom: 12 },
-  backButtonText: { fontWeight: "700" },
-  title: { fontSize: 28, fontWeight: "800", letterSpacing: -0.3 },
-  subtitle: { marginTop: 6 },
-  serviceInfoCard: { marginTop: 14, borderWidth: 1, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  serviceInfoLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  serviceInfoIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  serviceInfoTitle: { fontWeight: "700" },
-  serviceInfoPrice: { fontWeight: "800", fontSize: 16 },
-  sectionTitle: { marginTop: 22, fontSize: 20, fontWeight: "800", letterSpacing: -0.2 },
-  sectionCaption: { marginTop: 6 },
-  dateRow: { paddingVertical: 10, gap: 8 },
-  dateChip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1 },
-  dateChipText: { fontSize: 12, fontWeight: "600" },
-  slotGrid: { marginTop: 12, flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  slotButton: { minWidth: 78, alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 14, borderWidth: 1 },
-  slotButtonText: { fontWeight: "700", fontSize: 14 },
-  emptyText: { marginTop: 10 },
-  selectionRow: { marginTop: 14, flexDirection: "row", alignItems: "center", gap: 8 },
-  selectionText: { fontWeight: "600" },
-  continueButton: {
-    marginTop: 16, marginBottom: 24, backgroundColor: "#6C5CE7", borderRadius: 16,
-    alignItems: "center", justifyContent: "center", paddingVertical: 14,
-    flexDirection: "row", gap: 8,
-    shadowColor: "#6C5CE7", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6
+  container: {
+    flex: 1
   },
-  continueButtonText: { color: "#ffffff", fontWeight: "800", fontSize: 16 }
+  scrollContent: {
+    paddingBottom: 48
+  },
+  page: {
+    width: "100%",
+    maxWidth: 1180,
+    alignSelf: "center",
+    paddingHorizontal: 18,
+    paddingTop: 18
+  },
+  heroCard: {
+    height: 320,
+    borderRadius: 28,
+    borderWidth: 1,
+    overflow: "hidden"
+  },
+  coverImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%"
+  },
+  coverOverlay: {
+    ...StyleSheet.absoluteFillObject
+  },
+  heroTopRow: {
+    position: "absolute",
+    top: 18,
+    left: 18,
+    right: 18,
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  coverButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9
+  },
+  coverButtonText: {
+    fontWeight: "900",
+    fontSize: 13
+  },
+  heroContent: {
+    position: "absolute",
+    left: 24,
+    right: 24,
+    bottom: 24,
+    maxWidth: 680
+  },
+  stepBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7
+  },
+  stepBadgeText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 12
+  },
+  heroTitle: {
+    color: "#FFFFFF",
+    fontSize: 38,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+    marginTop: 14
+  },
+  heroDescription: {
+    color: "rgba(255,255,255,0.86)",
+    fontSize: 16,
+    lineHeight: 24,
+    marginTop: 8
+  },
+  contentGrid: {
+    gap: 16,
+    marginTop: 16
+  },
+  contentGridWide: {
+    flexDirection: "row",
+    alignItems: "flex-start"
+  },
+  mainColumn: {
+    flex: 1,
+    gap: 16
+  },
+  sideColumn: {
+    gap: 14
+  },
+  sideColumnWide: {
+    width: 330
+  },
+  sectionCard: {
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 20
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 14,
+    marginBottom: 16
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: -0.3
+  },
+  sectionCaption: {
+    marginTop: 6,
+    fontSize: 14,
+    fontWeight: "600"
+  },
+  dateRow: {
+    gap: 10,
+    paddingRight: 8
+  },
+  dateCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 15,
+    minWidth: 150
+  },
+  dateLabel: {
+    fontWeight: "900",
+    fontSize: 15
+  },
+  dateSlotCount: {
+    marginTop: 5,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  noSlotCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 20,
+    alignItems: "center"
+  },
+  noSlotTitle: {
+    marginTop: 10,
+    fontWeight: "900",
+    fontSize: 17
+  },
+  noSlotText: {
+    marginTop: 6,
+    textAlign: "center",
+    lineHeight: 22
+  },
+  timeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  timeCard: {
+    minWidth: 104,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    alignItems: "center"
+  },
+  timeText: {
+    fontWeight: "900",
+    fontSize: 16
+  },
+  timeStatus: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  summaryCard: {
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 20
+  },
+  summaryTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: 10
+  },
+  infoLine: {
+    borderBottomWidth: 1,
+    paddingVertical: 13,
+    gap: 8
+  },
+  infoLineLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  infoLineLabel: {
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  infoLineValue: {
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  continueButton: {
+    borderRadius: 18,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    shadowColor: "#6C5CE7",
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6
+  },
+  continueButtonDisabled: {
+    opacity: 0.42
+  },
+  continueButtonText: {
+    color: "#ffffff",
+    fontWeight: "900",
+    fontSize: 16
+  },
+  helpText: {
+    textAlign: "center",
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600"
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24
+  },
+  emptyCard: {
+    width: "100%",
+    maxWidth: 440,
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 28,
+    alignItems: "center"
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 14,
+    marginBottom: 8
+  },
+  emptyText: {
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 18
+  },
+  emptyButton: {
+    borderRadius: 999,
+    paddingHorizontal: 22,
+    paddingVertical: 12
+  },
+  emptyButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "900"
+  }
 });

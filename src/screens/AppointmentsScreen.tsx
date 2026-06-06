@@ -1,37 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Appointment } from "../types/appointment";
-import { Barber } from "../types/barber";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useTheme } from "../theme/ThemeContext";
+import { useApp } from "../context/AppContext";
+import type { AppointmentsStackParamList } from "../types/navigation";
+import { parseDateTime, formatRemaining } from "../utils/dateUtils";
+import { AppointmentCardSkeleton } from "../components/Skeleton";
 
-type AppointmentsScreenProps = {
-  appointments: Appointment[];
-  barbers: Barber[];
-  onOpenAppointment: (appointmentId: string) => void;
-};
-
-function parseDateTime(dateKey: string, time: string): Date {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const [hour, minute] = time.split(":").map(Number);
-  return new Date(year, month - 1, day, hour, minute, 0, 0);
-}
-
-function formatRemaining(target: Date, now: Date): string {
-  const diffMs = target.getTime() - now.getTime();
-  if (diffMs <= 0) return "Geçti";
-  const totalMinutes = Math.floor(diffMs / 60000);
-  const days = Math.floor(totalMinutes / (24 * 60));
-  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
-  const minutes = totalMinutes % 60;
-  if (days > 0) return `${days}g ${hours}s`;
-  if (hours > 0) return `${hours}s ${minutes}d`;
-  return `${minutes} dk`;
-}
-
-export function AppointmentsScreen({ appointments, barbers, onOpenAppointment }: AppointmentsScreenProps) {
+export function AppointmentsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<AppointmentsStackParamList>>();
+  const { appointments, barbers, dataLoaded } = useApp();
   const { colors, mode } = useTheme();
   const [clock, setClock] = useState(() => Date.now());
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const intervalId = setInterval(() => setClock(Date.now()), 30000);
@@ -45,40 +28,90 @@ export function AppointmentsScreen({ appointments, barbers, onOpenAppointment }:
       if (!barber) return null;
       const service = barber.services.find((item) => item.id === appointment.serviceId);
       if (!service) return null;
-      return { ...appointment, barber, service, appointmentDate: parseDateTime(appointment.date, appointment.time) };
+      const appointmentDate = parseDateTime(appointment.date, appointment.time);
+      const isPast = appointmentDate.getTime() <= now.getTime();
+      const status = appointment.status || (isPast ? "completed" : "upcoming");
+      return { ...appointment, barber, service, appointmentDate, status };
     }).filter((item): item is NonNullable<typeof item> => item !== null)
       .sort((a, b) => a.appointmentDate.getTime() - b.appointmentDate.getTime());
-  }, [appointments, barbers]);
+  }, [appointments, barbers, now]);
 
   const secondaryBadgeBg = mode === "dark" ? "rgba(0, 210, 255, 0.1)" : "rgba(8, 145, 178, 0.08)";
   const secondaryBadgeBorder = mode === "dark" ? "rgba(0, 210, 255, 0.2)" : "rgba(8, 145, 178, 0.2)";
   const pastBadgeBg = mode === "dark" ? "rgba(58, 69, 99, 0.2)" : "rgba(148, 163, 184, 0.1)";
   const pastBadgeBorder = mode === "dark" ? "rgba(58, 69, 99, 0.3)" : "rgba(148, 163, 184, 0.2)";
+  const completedBadgeBg = mode === "dark" ? "rgba(52, 211, 153, 0.1)" : "rgba(5, 150, 105, 0.08)";
+  const completedBadgeBorder = mode === "dark" ? "rgba(52, 211, 153, 0.2)" : "rgba(5, 150, 105, 0.2)";
+
+  async function onRefresh() {
+    setRefreshing(true);
+    setClock(Date.now());
+    await new Promise(resolve => setTimeout(resolve, 600));
+    setRefreshing(false);
+  }
+
+  function getStatusBadge(status: string, isPast: boolean) {
+    if (status === "completed") {
+      return { bg: completedBadgeBg, border: completedBadgeBorder, color: colors.success, icon: "checkmark-circle-outline" as const, label: "Tamamlandı" };
+    }
+    if (status === "cancelled") {
+      return { bg: pastBadgeBg, border: pastBadgeBorder, color: colors.textMuted, icon: "close-circle-outline" as const, label: "İptal Edildi" };
+    }
+    if (isPast) {
+      return { bg: pastBadgeBg, border: pastBadgeBorder, color: colors.textMuted, icon: "timer-outline" as const, label: "Geçti" };
+    }
+    return null;
+  }
 
   return (
     <View style={styles.container}>
       <Text style={[styles.title, { color: colors.textPrimary }]}>Randevularım</Text>
       <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Aldığın randevular burada listelenir.</Text>
 
-      <FlatList data={appointmentItems} keyExtractor={(item) => item.id} showsVerticalScrollIndicator={false}
+      <FlatList data={!dataLoaded ? [] : appointmentItems} keyExtractor={(item) => item.id} showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <Ionicons name="calendar-outline" size={40} color={colors.textMuted} />
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>Henüz alınmış randevu yok.</Text>
-          </View>
+          !dataLoaded ? (
+            <View>
+              <AppointmentCardSkeleton />
+              <AppointmentCardSkeleton />
+              <AppointmentCardSkeleton />
+            </View>
+          ) : (
+            <View style={styles.emptyWrap}>
+              <Ionicons name="calendar-outline" size={40} color={colors.textMuted} />
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>Henüz alınmış randevu yok.</Text>
+            </View>
+          )
         }
         renderItem={({ item }) => {
           const isPast = item.appointmentDate.getTime() <= now.getTime();
           const remaining = formatRemaining(item.appointmentDate, now);
+          const statusBadge = getStatusBadge(item.status, isPast);
           return (
-            <Pressable style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]} onPress={() => onOpenAppointment(item.id)}>
-              <View style={[styles.remainingBadge, {
-                backgroundColor: isPast ? pastBadgeBg : secondaryBadgeBg,
-                borderColor: isPast ? pastBadgeBorder : secondaryBadgeBorder
-              }]}>
-                <Ionicons name="timer-outline" size={12} color={isPast ? colors.textMuted : colors.secondary} />
-                <Text style={[styles.remainingLabel, { color: isPast ? colors.textMuted : colors.secondary }]}>{remaining}</Text>
+            <Pressable style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]} onPress={() => navigation.navigate("AppointmentDetail", { appointmentId: item.id })}>
+              <View style={styles.badgeRow}>
+                {statusBadge && (
+                  <View style={[styles.statusBadge, { backgroundColor: statusBadge.bg, borderColor: statusBadge.border }]}>
+                    <Ionicons name={statusBadge.icon} size={12} color={statusBadge.color} />
+                    <Text style={[styles.statusLabel, { color: statusBadge.color }]}>{statusBadge.label}</Text>
+                  </View>
+                )}
+                <View style={[styles.remainingBadge, {
+                  backgroundColor: isPast ? pastBadgeBg : secondaryBadgeBg,
+                  borderColor: isPast ? pastBadgeBorder : secondaryBadgeBorder
+                }]}>
+                  <Ionicons name="timer-outline" size={12} color={isPast ? colors.textMuted : colors.secondary} />
+                  <Text style={[styles.remainingLabel, { color: isPast ? colors.textMuted : colors.secondary }]}>{remaining}</Text>
+                </View>
               </View>
               <Text style={[styles.barberName, { color: colors.textPrimary }]}>{item.barber.name}</Text>
               <View style={styles.infoRow}><Ionicons name="cut-outline" size={13} color={colors.primary} /><Text style={[styles.infoText, { color: colors.textSecondary }]}>{item.service.name}</Text></View>
@@ -101,9 +134,12 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: "center", marginTop: 50, gap: 12 },
   emptyText: { textAlign: "center", fontSize: 14 },
   card: { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 10 },
-  remainingBadge: { position: "absolute", right: 12, top: 12, flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
+  badgeRow: { flexDirection: "row", justifyContent: "flex-end", gap: 6, marginBottom: 4 },
+  statusBadge: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
+  statusLabel: { fontSize: 12, fontWeight: "700" },
+  remainingBadge: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
   remainingLabel: { fontSize: 12, fontWeight: "700" },
-  barberName: { fontSize: 18, fontWeight: "800", marginBottom: 8, paddingRight: 100, letterSpacing: -0.2 },
+  barberName: { fontSize: 18, fontWeight: "800", marginBottom: 8, letterSpacing: -0.2 },
   infoRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3 },
   infoText: {},
   openHintRow: { marginTop: 12, flexDirection: "row", alignItems: "center", gap: 4 },

@@ -1,17 +1,22 @@
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { CompositeNavigationProp } from "@react-navigation/native";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { BarberCard } from "../components/BarberCard";
-import { Barber } from "../types/barber";
 import { useTheme } from "../theme/ThemeContext";
+import { useApp } from "../context/AppContext";
+import type { RootTabParamList, HomeStackParamList } from "../types/navigation";
 
-type FavoritesScreenProps = {
-  barbers: Barber[];
-  favoriteBarberIds: string[];
-  onSelectBarber: (barber: Barber) => void;
-  onToggleFavorite: (barberId: string) => void;
-};
+type FavoritesNavProp = CompositeNavigationProp<
+  BottomTabNavigationProp<RootTabParamList, "FavoritesTab">,
+  NativeStackNavigationProp<HomeStackParamList>
+>;
 
-export function FavoritesScreen({ barbers, favoriteBarberIds, onSelectBarber, onToggleFavorite }: FavoritesScreenProps) {
+export function FavoritesScreen() {
+  const navigation = useNavigation<FavoritesNavProp>();
+  const { barbers, favoriteBarberIds, toggleFavorite } = useApp();
   const { colors } = useTheme();
   const favoriteBarbers = barbers.filter((barber) => favoriteBarberIds.includes(barber.id));
 
@@ -31,7 +36,14 @@ export function FavoritesScreen({ barbers, favoriteBarberIds, onSelectBarber, on
           </View>
         }
         renderItem={({ item }) => (
-          <BarberCard barber={item} onPress={onSelectBarber} isFavorite={true} onToggleFavorite={onToggleFavorite} />
+          <BarberCard
+            barber={item}
+            onPress={(barber) => {
+              navigation.navigate("HomeTab", { screen: "BarberDetail", params: { barberId: barber.id } });
+            }}
+            isFavorite={true}
+            onToggleFavorite={toggleFavorite}
+          />
         )}
       />
     </View>

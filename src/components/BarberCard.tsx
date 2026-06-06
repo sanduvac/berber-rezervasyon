@@ -2,6 +2,8 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Barber } from "../types/barber";
 import { useTheme } from "../theme/ThemeContext";
+import { isOpenNow } from "../utils/dateUtils";
+import { lightHaptic } from "../utils/haptics";
 
 type BarberCardProps = {
   barber: Barber;
@@ -10,22 +12,7 @@ type BarberCardProps = {
   onToggleFavorite: (barberId: string) => void;
 };
 
-function toMinutes(value: string): number {
-  const [hour, minute] = value.split(":").map(Number);
-  return hour * 60 + minute;
-}
 
-function isOpenNow(barber: Barber, now: Date = new Date()): boolean {
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const openingMinutes = toMinutes(barber.openingTime);
-  const closingMinutes = toMinutes(barber.closingTime);
-
-  if (openingMinutes <= closingMinutes) {
-    return currentMinutes >= openingMinutes && currentMinutes < closingMinutes;
-  }
-
-  return currentMinutes >= openingMinutes || currentMinutes < closingMinutes;
-}
 
 export function BarberCard({ barber, onPress, isFavorite, onToggleFavorite }: BarberCardProps) {
   const { colors } = useTheme();
@@ -52,7 +39,7 @@ export function BarberCard({ barber, onPress, isFavorite, onToggleFavorite }: Ba
             <Text style={[styles.badgeText, { color: colors.textPrimary }]}>{barber.rating.toFixed(1)}</Text>
           </View>
         </View>
-        <Pressable style={[styles.favoriteButton, { backgroundColor: colors.coverBadgeBg, borderColor: colors.coverBadgeBorder }]} onPress={() => onToggleFavorite(barber.id)}>
+        <Pressable style={[styles.favoriteButton, { backgroundColor: colors.coverBadgeBg, borderColor: colors.coverBadgeBorder }]} onPress={() => { lightHaptic(); onToggleFavorite(barber.id); }}>
           <Ionicons
             name={isFavorite ? "heart" : "heart-outline"}
             size={18}
